@@ -1,0 +1,9 @@
+package: v0
+generate:
+  chi-server: true
+  client: false
+  models: true
+  strict-server: true
+output: gen.go
+output-options:
+  skip-prune: true

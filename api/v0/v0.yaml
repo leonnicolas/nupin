@@ -1,0 +1,77 @@
+openapi: 3.0.0
+info:
+  version: 0.1.0
+  title: internal nupin API
+  description: The specification for the internal API of nupin
+  license:
+    name: MIT
+paths:
+  /v0/code:
+    put:
+      description: Set a new code/pin
+      summary: Creates or replaces the users code/pin
+      operationId: updatePin
+      requestBody:
+        description: Holds the new code/pin
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetCodePayload'
+      responses:
+        "200":
+          description: Code/Pin update was successful
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /v0/user:
+    get:
+      description: get the loged in user
+      summary: get the loged in user
+      operationId: getUser
+      responses:
+        "200":
+          $ref: '#/components/responses/UserGetResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  schemas:
+    SetCodePayload:
+      properties:
+        code:
+          type: integer
+      required:
+        - code
+    User:
+      properties:
+        code:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+      required:
+        - code
+        - email
+        - name
+    ApiError:
+      description: An error response.
+      properties:
+        error:
+          type: string
+        displayMessage:
+          type: string
+      required:
+      - error
+  responses:
+    UserGetResponse:
+      description: The current user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+    ErrorResponse:
+      description: An error response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
