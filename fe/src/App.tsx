@@ -6,7 +6,7 @@ import {
   User,
   ResponseError,
   ApiErrorFromJSON,
-  ApiError
+  ApiError,
 } from "./client";
 import { Alert, Button, Container, Form } from "react-bootstrap";
 
@@ -79,11 +79,7 @@ function App() {
             minLength={6}
             type="password"
             onChange={(e) => {
-              if (code === undefined) {
-                setCode("");
-              } else {
-                setCode(removeInvalid(e.target.value));
-              }
+              setCode(removeInvalid(e.target.value));
             }}
             value={code ?? ""}
             isValid={isValid(code ?? "")}
@@ -93,9 +89,15 @@ function App() {
             Must have exactly 6 digits
           </Form.Control.Feedback>
         </Form.Group>
-        <Button className="mb-3" type="submit" disabled={!isValid(code?? "")}>Update Pin Code</Button>
+        <Button className="mb-3" type="submit" disabled={!isValid(code ?? "")}>
+          Update Pin Code
+        </Button>
         {message && <Alert variant="success">{message}</Alert>}
-        {error && <Alert title={error.error} variant="danger">{error.displayMessage}</Alert>}
+        {error && (
+          <Alert title={error.error} variant="danger">
+            {error.displayMessage}
+          </Alert>
+        )}
       </Form>
     </Container>
   );

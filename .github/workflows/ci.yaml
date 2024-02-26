@@ -16,7 +16,7 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version: '1.21'
-    - run: make
+    - run: make build-all
     - id: sha
       run:  echo "sha=$(git describe --always --tags --dirty)" >> $GITHUB_OUTPUT
     outputs:
@@ -39,6 +39,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: yarn
+      - run: make fe/build
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - run: make build-all
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -54,5 +63,5 @@ jobs:
           platforms: linux/arm64, linux/arm, linux/amd64
           push: ${{github.ref_name == 'main'}}
           tags: |-
-            ghcr.io/leonnicolas/nuki:latest
-            ghcr.io/leonnicolas/nuki:${{ needs.build.outputs.sha }}
+            ghcr.io/leonnicolas/nupin:latest
+            ghcr.io/leonnicolas/nupin:${{ needs.build.outputs.sha }}

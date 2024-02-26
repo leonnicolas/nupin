@@ -1,7 +1,14 @@
-.PHONY: generate build
+.PHONY: generate build build-all generate-all fe/build clean
+
+ALL_ARCH := amd64 arm arm64
 
 build:
 	CGO_ENABLED=0 go build .
+
+build-all:
+	for arch in $(ALL_ARCH); do \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 go build -o bin/linux/$$arch/nupin .; \
+	done
 
 generate: api/nuki/swagger.json
 	go generate ./...
@@ -15,4 +22,8 @@ fe/src/client/index.ts:
 	docker run --rm -v "$$(pwd)":/src --user $$(id -u):$$(id -g) openapitools/openapi-generator-cli:v7.3.0 generate -i /src/api/v0/v0.yaml -g typescript-fetch -o /src/fe/src/client
 
 fe/build:
-	cd fe && yarn build
+	cd fe && yarn install && yarn build
+
+clean:
+	rm -rf fe/dist
+	rm -rf bin
