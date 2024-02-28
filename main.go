@@ -141,7 +141,16 @@ func callbackHandler(oauth2Config *oauth2.Config, cfg *config.Config, verifier *
 			HttpOnly: true,
 			Path:     "/",
 		})
-		http.Redirect(w, r, "/", http.StatusFound)
+
+		// Firefox and Safari don't set the jwt cookie when using SameSite=strict right after the redirect.
+		// Resulting in an endless sign in loop. This can be fixed with SameSite=lax (not the same security)
+		// or using client side redirect. See below!
+		fmt.Fprint(w,
+			`<!DOCTYPE html>
+			<html>
+				<head><meta http-equiv="refresh" content="0; url='/'"></head>
+				<body></body>
+			</html>`)
 
 		return
 	}

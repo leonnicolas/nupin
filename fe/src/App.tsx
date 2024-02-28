@@ -86,7 +86,7 @@ function App() {
           </Nav>
         </Container>
       </Navbar>
-      <Container className="d-flex flex-column min-vh-100 justify-content-center align-items-center">
+      <Container className="d-flex flex-column justify-content-center align-items-center my-5">
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
             <Form.Label>Email Address</Form.Label>
