@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    app.kubernetes.io/name: nupin
+  name: nupin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nupin
+  template:
+    metadata:
+      annotations:
+      labels:
+        app.kubernetes.io/name: nupin
+    spec:
+      containers:
+      - command:
+        - /bin/nupin
+        args:
+          - -c
+          - /config.yaml
+        image: ghcr.io/leonnicolas/nupin
+        name: server
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 250M
+          requests:
+            cpu: 50m
+            memory: 100M
+        volumeMounts:
+          - name: config
+            mountPath: /config.yaml
+            subPath: config.yaml
+      volumes:
+        - name: config
+          secret:
+            secretName: nupin-config

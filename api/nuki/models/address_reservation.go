@@ -58,6 +58,10 @@ type AddressReservation struct {
 	// Required: true
 	GuestsIssued *int32 `json:"guestsIssued"`
 
+	// has custom access times
+	// Required: true
+	HasCustomAccessTimes *bool `json:"hasCustomAccessTimes"`
+
 	// The id
 	// Required: true
 	ID *string `json:"id"`
@@ -130,6 +134,10 @@ func (m *AddressReservation) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateGuestsIssued(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateHasCustomAccessTimes(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -236,6 +244,15 @@ func (m *AddressReservation) validateGuests(formats strfmt.Registry) error {
 func (m *AddressReservation) validateGuestsIssued(formats strfmt.Registry) error {
 
 	if err := validate.Required("guestsIssued", "body", m.GuestsIssued); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *AddressReservation) validateHasCustomAccessTimes(formats strfmt.Registry) error {
+
+	if err := validate.Required("hasCustomAccessTimes", "body", m.HasCustomAccessTimes); err != nil {
 		return err
 	}
 

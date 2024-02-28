@@ -82,7 +82,7 @@ type SmartlockAuth struct {
 
 	// The operation id - if set the auth is locked for another operations.
 	// Read Only: true
-	OperationID *ObjectID `json:"operationId,omitempty"`
+	OperationID ObjectID `json:"operationId,omitempty"`
 
 	// True if the auth has remote access
 	// Required: true
@@ -275,15 +275,13 @@ func (m *SmartlockAuth) validateOperationID(formats strfmt.Registry) error {
 		return nil
 	}
 
-	if m.OperationID != nil {
-		if err := m.OperationID.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("operationId")
-			} else if ce, ok := err.(*errors.CompositeError); ok {
-				return ce.ValidateName("operationId")
-			}
-			return err
+	if err := m.OperationID.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("operationId")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("operationId")
 		}
+		return err
 	}
 
 	return nil
@@ -356,20 +354,17 @@ func (m *SmartlockAuth) ContextValidate(ctx context.Context, formats strfmt.Regi
 
 func (m *SmartlockAuth) contextValidateOperationID(ctx context.Context, formats strfmt.Registry) error {
 
-	if m.OperationID != nil {
+	if swag.IsZero(m.OperationID) { // not required
+		return nil
+	}
 
-		if swag.IsZero(m.OperationID) { // not required
-			return nil
+	if err := m.OperationID.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("operationId")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("operationId")
 		}
-
-		if err := m.OperationID.ContextValidate(ctx, formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
-				return ve.ValidateName("operationId")
-			} else if ce, ok := err.(*errors.CompositeError); ok {
-				return ce.ValidateName("operationId")
-			}
-			return err
-		}
+		return err
 	}
 
 	return nil

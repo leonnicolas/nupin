@@ -116,6 +116,10 @@ func (m *AccountSubscription) validateID(formats strfmt.Registry) error {
 		return err
 	}
 
+	if err := validate.Required("id", "body", m.ID); err != nil {
+		return err
+	}
+
 	if m.ID != nil {
 		if err := m.ID.Validate(formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {

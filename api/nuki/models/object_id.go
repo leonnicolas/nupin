@@ -8,85 +8,20 @@ package models
 import (
 	"context"
 
-	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
 )
 
 // ObjectID object Id
 //
 // swagger:model ObjectId
-type ObjectID struct {
-
-	// counter
-	Counter int32 `json:"counter,omitempty"`
-
-	// date
-	// Format: date-time
-	Date strfmt.DateTime `json:"date,omitempty"`
-
-	// machine identifier
-	MachineIdentifier int32 `json:"machineIdentifier,omitempty"`
-
-	// process identifier
-	ProcessIdentifier int32 `json:"processIdentifier,omitempty"`
-
-	// time
-	Time int64 `json:"time,omitempty"`
-
-	// time second
-	TimeSecond int32 `json:"timeSecond,omitempty"`
-
-	// timestamp
-	Timestamp int32 `json:"timestamp,omitempty"`
-}
+type ObjectID string
 
 // Validate validates this object Id
-func (m *ObjectID) Validate(formats strfmt.Registry) error {
-	var res []error
-
-	if err := m.validateDate(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if len(res) > 0 {
-		return errors.CompositeValidationError(res...)
-	}
-	return nil
-}
-
-func (m *ObjectID) validateDate(formats strfmt.Registry) error {
-	if swag.IsZero(m.Date) { // not required
-		return nil
-	}
-
-	if err := validate.FormatOf("date", "body", "date-time", m.Date.String(), formats); err != nil {
-		return err
-	}
-
+func (m ObjectID) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
 // ContextValidate validates this object Id based on context it is used
-func (m *ObjectID) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
-	return nil
-}
-
-// MarshalBinary interface implementation
-func (m *ObjectID) MarshalBinary() ([]byte, error) {
-	if m == nil {
-		return nil, nil
-	}
-	return swag.WriteJSON(m)
-}
-
-// UnmarshalBinary interface implementation
-func (m *ObjectID) UnmarshalBinary(b []byte) error {
-	var res ObjectID
-	if err := swag.ReadJSON(b, &res); err != nil {
-		return err
-	}
-	*m = res
+func (m ObjectID) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }

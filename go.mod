@@ -5,6 +5,7 @@ go 1.21.5
 require (
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/deepmap/oapi-codegen v1.16.2
+	github.com/evanphx/json-patch v0.5.2
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-openapi/errors v0.21.0
 	github.com/go-openapi/runtime v0.26.2
