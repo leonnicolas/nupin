@@ -17,6 +17,9 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-openapi/strfmt"
+
+	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
 	flag "github.com/spf13/pflag"
 	"golang.org/x/oauth2"
@@ -144,41 +147,49 @@ func callbackHandler(oauth2Config *oauth2.Config, cfg *config.Config, verifier *
 	}
 }
 
+func redirectOrError(w http.ResponseWriter, r *http.Request, code int, msg string) {
+	if header := r.Header.Get("Accept"); header == "application/json" {
+		w.WriteHeader(code)
+		json.NewEncoder(w).Encode(v0.ErrorResponse{
+			Error: msg,
+		})
+		return
+	}
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
 func authMiddleware(next http.HandlerFunc, verifier *oidc.IDTokenVerifier, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("jwt")
 		if err != nil {
 			fmt.Println("no cookie")
-			http.Redirect(w, r, "/login", http.StatusFound)
+			redirectOrError(w, r, http.StatusUnauthorized, "missing cookie")
 
 			return
 		}
 
 		idToken, err := verifier.Verify(r.Context(), c.Value)
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintf(w, "failed to verify token: %s", err.Error())
+			redirectOrError(w, r, http.StatusUnauthorized, fmt.Sprintf("failed to verify token: %s", err.Error()))
 
 			return
 		}
 
 		if !slices.Contains(idToken.Audience, cfg.Oidc.ClientID) {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintf(w, "wrong Audience: %s", err.Error())
+			redirectOrError(w, r, http.StatusUnauthorized, fmt.Sprintf("wrong Audience: %s", err.Error()))
 
 			return
 		}
 
 		if idToken.Expiry.Before(time.Now()) {
-			http.Redirect(w, r, "/login", http.StatusFound)
+			redirectOrError(w, r, http.StatusUnauthorized, fmt.Sprintf("session expired"))
 
 			return
 		}
 
 		var claims claims
 		if err := idToken.Claims(&claims); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "oauth callback failed: %s", err.Error())
+			redirectOrError(w, r, http.StatusBadRequest, fmt.Sprintf("oauth callback failed: %s", err.Error()))
 
 			return
 		}
@@ -201,10 +212,8 @@ func homeHandler() http.HandlerFunc {
 var ConfigPath string
 
 func init() {
-	flag.StringVarP(&ConfigPath, "Config", "c", "", "path to Config file")
+	flag.StringVarP(&ConfigPath, "config", "c", "", "path to Config file")
 }
-
-const appName = "nupin"
 
 type server struct {
 	c   *nukiclient.NukiAPI
@@ -288,6 +297,7 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 	}
 	var user *models.AccountUser
 	if len(usersResponse.Payload) == 0 {
+		log.Println("creating account user", "email", c.Email, "name", c.Name)
 		createResponse, err := s.c.AccountUser.AccountUsersResourcePutPut(
 			&account_user.AccountUsersResourcePutPutParams{
 				Context: ctx,
@@ -306,20 +316,29 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 		user = usersResponse.Payload[0]
 	}
 
+	opt := func(opt *runtime.ClientOperation) {
+		t := http.DefaultTransport.(*http.Transport).Clone()
+		t.DisableKeepAlives = true
+		httpClient := &http.Client{Transport: t}
+		opt.Client = httpClient
+	}
+
 	authRes, err := s.c.SmartlockAuth.SmartlockAuthsResourceGetGet(
 		&smartlock_auth.SmartlockAuthsResourceGetGetParams{
 			Context: ctx, Types: ptr("13"),
 			SmartlockID: s.cfg.Nuki.SmartLockDevice,
 		},
 		httptransport.BearerToken(s.cfg.Nuki.APIKey),
+		opt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auths %w", err)
 	}
 	index := slices.IndexFunc(authRes.Payload, func(a *models.SmartlockAuth) bool {
-		return a.Name != nil && *a.Name == c.Email
+		return a.AccountUserID == *user.AccountUserID
 	})
 	if index == -1 {
+		log.Println("creating auth user", "accountID", *user.AccountUserID, "name", c.Name)
 		_, err := s.c.SmartlockAuth.SmartlockAuthsResourcePutPut(
 			&smartlock_auth.SmartlockAuthsResourcePutPutParams{
 				SmartlockID: s.cfg.Nuki.SmartLockDevice,
@@ -335,8 +354,9 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 			httptransport.BearerToken(s.cfg.Nuki.APIKey),
 		)
 		if err != nil {
+			log.Println("failed to create auth user", "accountID", *user.AccountUserID, "name", c.Name, err.Error())
 			return v0.UpdatePindefaultJSONResponse{
-				StatusCode: http.StatusInternalServerError,
+				StatusCode: http.StatusBadRequest,
 				Body: v0.ApiError{
 					DisplayMessage: ptr("please try another Pin"),
 					Error:          err.Error(),
@@ -347,22 +367,32 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 		return &v0.UpdatePin200Response{}, nil
 	}
 
-	log.Println("found smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth name", *authRes.Payload[index].Name)
+	log.Println("found smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth ID", *user.AccountUserID, "auth name", *authRes.Payload[index].Name)
 
 	_, err = s.c.SmartlockAuth.SmartlockAuthResourcePostPost(
 		&smartlock_auth.SmartlockAuthResourcePostPostParams{
 			SmartlockID: s.cfg.Nuki.SmartLockDevice,
 			Context:     ctx,
 			Body: &models.SmartlockAuthUpdate{
-				Code: int32(request.Body.Code),
+				Code:          int32(request.Body.Code),
+				Enabled:       true,
+				AccountUserID: *user.AccountUserID,
 			},
 			ID: *authRes.Payload[index].ID,
 		},
 		httptransport.BearerToken(s.cfg.Nuki.APIKey),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update pin %w", err)
+		return v0.UpdatePindefaultJSONResponse{
+			StatusCode: http.StatusBadRequest,
+			Body: v0.ApiError{
+				DisplayMessage: ptr("please try another Pin"),
+				Error:          err.Error(),
+			},
+		}, nil
 	}
+
+	log.Println("updated smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth name", *authRes.Payload[index].Name)
 
 	return &v0.UpdatePin200Response{}, nil
 }
@@ -402,12 +432,7 @@ func main() {
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
-	u, err := url.Parse("http://localhost:3000")
-	if err != nil {
-		panic(err)
-	}
-
-	client := nukiclient.NewHTTPClientWithConfig(nil, &nukiclient.TransportConfig{
+	client := nukiclient.NewHTTPClientWithConfig(strfmt.Default, &nukiclient.TransportConfig{
 		Host:    "api.nuki.io",
 		Schemes: []string{"https"},
 	})
@@ -426,14 +451,25 @@ func main() {
 	}
 
 	mux.HandleFunc("/login", redirectHandler(&oauth2Config, s, rG))
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			SameSite: http.SameSiteStrictMode,
+			Name:     "jwt",
+			Domain:   cfg.Oidc.CookieDomain,
+			HttpOnly: true,
+			Path:     "/",
+			Expires:  time.Time{},
+		})
+		http.Redirect(w, r, "/", http.StatusFound)
+	})
 	mux.HandleFunc("/auth/callback", callbackHandler(&oauth2Config, &cfg, verifier, s))
-	mux.HandleFunc("/a", authMiddleware(homeHandler(), verifier, &cfg))
 	mux.Mount("/api",
 		authMiddleware(
 			func(w http.ResponseWriter, r *http.Request) {
 				v0.HandlerWithOptions(v0.NewStrictHandlerWithOptions(&server{c: client, cfg: &cfg}, nil,
 					v0.StrictHTTPServerOptions{
 						RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+							log.Println("request error", err.Error())
 							w.Header().Set("Content-Type", "application/json")
 							w.WriteHeader(http.StatusUnprocessableEntity)
 							json.NewEncoder(w).Encode(v0.ErrorResponse{
@@ -442,6 +478,7 @@ func main() {
 							})
 						},
 						ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+							log.Println("response error", err.Error())
 							w.Header().Set("Content-Type", "application/json")
 							w.WriteHeader(http.StatusInternalServerError)
 							json.NewEncoder(w).Encode(v0.ErrorResponse{
@@ -459,20 +496,27 @@ func main() {
 			},
 			verifier, &cfg))
 	if v, ok := os.LookupEnv("NUPIN_DEVELOPMENT"); ok && v == "true" {
-		log.Println("proxy /* to localhost:3000")
-		mux.Handle("/*", authMiddleware(
+		u, err := url.Parse("http://localhost:3000")
+		if err != nil {
+			panic(err)
+		}
+
+		log.Printf("proxy /* to %s\n", u.String())
+		mux.Handle("/", authMiddleware(
 			func(w http.ResponseWriter, r *http.Request) {
 				httputil.NewSingleHostReverseProxy(u).ServeHTTP(w, r)
 			}, verifier, &cfg))
+		mux.Handle("/*", httputil.NewSingleHostReverseProxy(u))
 	} else {
 		dir, err := fs.Sub(public, "fe/build")
 		if err != nil {
 			panic(err)
 		}
-		mux.Handle("/*", authMiddleware(
+		mux.HandleFunc("/", authMiddleware(
 			func(w http.ResponseWriter, r *http.Request) {
 				http.FileServer(http.FS(dir)).ServeHTTP(w, r)
 			}, verifier, &cfg))
+		mux.Handle("/*", http.FileServer(http.FS(dir)))
 	}
-	http.ListenAndServe(cfg.Web.Address, mux)
+	log.Fatal(http.ListenAndServe(cfg.Web.Address, mux))
 }

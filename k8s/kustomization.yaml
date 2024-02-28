@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: nupin
+
+resources:
+  - manifests/deployment.yaml
+  - manifests/svc.yaml
+  - manifests/ingress.yaml
+
+secretGenerator:
+- files:
+  - manifests/secrets/config.yaml
+  name: nupin-config
+
+images:
+- name: ghcr.io/leonnicolas/nupin
+  newTag: latest
+replicas:
+- count: 1
+  name: nupin

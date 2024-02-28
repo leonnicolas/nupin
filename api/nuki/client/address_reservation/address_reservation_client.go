@@ -36,6 +36,8 @@ type ClientService interface {
 
 	AddressReservationsResourceGetGet(params *AddressReservationsResourceGetGetParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*AddressReservationsResourceGetGetOK, error)
 
+	ReservationAccessTimesUpdateResourcePostPost(params *ReservationAccessTimesUpdateResourcePostPostParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ReservationAccessTimesUpdateResourcePostPostNoContent, error)
+
 	SetTransport(transport runtime.ClientTransport)
 }
 
@@ -153,6 +155,45 @@ func (a *Client) AddressReservationsResourceGetGet(params *AddressReservationsRe
 	// unexpected success response
 	// safeguard: normally, absent a default response, unknown success responses return an error above: so this is a codegen issue
 	msg := fmt.Sprintf("unexpected success response for AddressReservationsResource_get_get: API contract not enforced by server. Client expected to get an error, but got: %T", result)
+	panic(msg)
+}
+
+/*
+ReservationAccessTimesUpdateResourcePostPost updates access times of a reservation
+*/
+func (a *Client) ReservationAccessTimesUpdateResourcePostPost(params *ReservationAccessTimesUpdateResourcePostPostParams, authInfo runtime.ClientAuthInfoWriter, opts ...ClientOption) (*ReservationAccessTimesUpdateResourcePostPostNoContent, error) {
+	// TODO: Validate the params before sending
+	if params == nil {
+		params = NewReservationAccessTimesUpdateResourcePostPostParams()
+	}
+	op := &runtime.ClientOperation{
+		ID:                 "ReservationAccessTimesUpdateResource_post_post",
+		Method:             "POST",
+		PathPattern:        "/address/{addressId}/reservation/{id}/update/accesstimes",
+		ProducesMediaTypes: []string{"application/json"},
+		ConsumesMediaTypes: []string{"application/json"},
+		Schemes:            []string{"http"},
+		Params:             params,
+		Reader:             &ReservationAccessTimesUpdateResourcePostPostReader{formats: a.formats},
+		AuthInfo:           authInfo,
+		Context:            params.Context,
+		Client:             params.HTTPClient,
+	}
+	for _, opt := range opts {
+		opt(op)
+	}
+
+	result, err := a.transport.Submit(op)
+	if err != nil {
+		return nil, err
+	}
+	success, ok := result.(*ReservationAccessTimesUpdateResourcePostPostNoContent)
+	if ok {
+		return success, nil
+	}
+	// unexpected success response
+	// safeguard: normally, absent a default response, unknown success responses return an error above: so this is a codegen issue
+	msg := fmt.Sprintf("unexpected success response for ReservationAccessTimesUpdateResource_post_post: API contract not enforced by server. Client expected to get an error, but got: %T", result)
 	panic(msg)
 }
 

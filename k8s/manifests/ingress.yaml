@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nupin
+  labels:
+    app.kubernetes.io/name: nupin
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-issuer
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: domain.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: nupin
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+    - hosts:
+        - domain.com
+      secretName: nupin-certs

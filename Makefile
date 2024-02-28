@@ -15,8 +15,8 @@ generate: api/nuki/swagger.json
 
 generate-all: generate fe/src/client/index.ts
 
-api/nuki/swagger.json:
-	curl -o - https://api.nuki.io/static/swagger/swagger.json | sed 's/"int"/"integer"/' > $@
+api/nuki/swagger.json: api/nuki/patch.json
+	curl -o - https://api.nuki.io/static/swagger/swagger.json | sed 's/"int"/"integer"/' | go run github.com/evanphx/json-patch/cmd/json-patch -p ./api/nuki/patch.json | jq > $@
 
 fe/src/client/index.ts:
 	docker run --rm -v "$$(pwd)":/src --user $$(id -u):$$(id -g) openapitools/openapi-generator-cli:v7.3.0 generate -i /src/api/v0/v0.yaml -g typescript-fetch -o /src/fe/src/client

@@ -1,0 +1,4 @@
+[
+    {"op": "replace", "path": "/definitions/ObjectId/type", "value": "string"},
+    {"op": "remove", "path": "/definitions/ObjectId/properties"}
+]
