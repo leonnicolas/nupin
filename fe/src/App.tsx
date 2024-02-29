@@ -87,6 +87,13 @@ function App() {
         </Container>
       </Navbar>
       <Container className="d-flex flex-column justify-content-center align-items-center my-5">
+        <h3 className="mb-2"> Select a new Pin for the Nuki Door Lock</h3>
+        <h5
+          className="mb-4"
+          title="Zeros are not allowed because they are not on the keypad!"
+        >
+          Pins must have exactly 6 digits only containing numbers from 1 to 9
+        </h5>
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
             <Form.Label>Email Address</Form.Label>
@@ -110,7 +117,7 @@ function App() {
               isInvalid={!isValid(code ?? "")}
             />
             <Form.Control.Feedback type="invalid">
-              Must have exactly 6 digits
+              Must have exactly 6 digits from 1-9
             </Form.Control.Feedback>
           </Form.Group>
           <Button
