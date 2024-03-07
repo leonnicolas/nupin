@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -17,12 +18,15 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-openapi/strfmt"
-	passwdv "github.com/wagslane/go-password-validator"
-
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
+	"github.com/go-openapi/strfmt"
+	"github.com/metalmatze/signal/internalserver"
+	"github.com/oklog/run"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	flag "github.com/spf13/pflag"
+	passwdv "github.com/wagslane/go-password-validator"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v3"
 
@@ -426,6 +430,7 @@ func main() {
 	var cfg config.Config
 	cfg.Web.Address = ":9999"
 	cfg.Nuki.MinimumPinEntropy = 10
+	cfg.Web.InternalAddress = ":9090"
 
 	if ConfigPath != "" {
 		log.Println("reading Config from", ConfigPath)
@@ -452,10 +457,18 @@ func main() {
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 	}
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+
 	client := nukiclient.NewHTTPClientWithConfig(strfmt.Default, &nukiclient.TransportConfig{
 		Host:    "api.nuki.io",
 		Schemes: []string{"https"},
 	})
+
+	client.AccountUser = account_user.NewInstrumentedClientService(client.AccountUser, prometheus.WrapRegistererWith(prometheus.Labels{"api": "account_user"}, reg))
+	client.SmartlockAuth = smartlock_auth.NewInstrumentedClientService(client.SmartlockAuth, prometheus.WrapRegistererWith(prometheus.Labels{"api": "smartlock_auth"}, reg))
+
+	serverImpl := &server{c: client, cfg: &cfg}
 
 	mux := chi.NewRouter()
 	rG := &randomGenerator{}
@@ -483,38 +496,40 @@ func main() {
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
 	mux.HandleFunc("/auth/callback", callbackHandler(&oauth2Config, &cfg, verifier, s))
+	v0Handler := v0.HandlerWithOptions(v0.NewInstrumentedServerInterface(v0.NewStrictHandlerWithOptions(serverImpl, nil,
+		v0.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Println("request error", err.Error())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				json.NewEncoder(w).Encode(v0.ErrorResponse{
+					Error:          err.Error(),
+					DisplayMessage: ptr("unexpected error"),
+				})
+			},
+			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Println("response error", err.Error())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(v0.ErrorResponse{
+					Error:          err.Error(),
+					DisplayMessage: ptr("unexpected error"),
+				})
+			},
+		}), reg),
+		v0.ChiServerOptions{
+			ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Println("chi error handler", err.Error())
+				return
+			},
+		})
 	mux.Mount("/api",
 		authMiddleware(
 			func(w http.ResponseWriter, r *http.Request) {
-				v0.HandlerWithOptions(v0.NewStrictHandlerWithOptions(&server{c: client, cfg: &cfg}, nil,
-					v0.StrictHTTPServerOptions{
-						RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-							log.Println("request error", err.Error())
-							w.Header().Set("Content-Type", "application/json")
-							w.WriteHeader(http.StatusUnprocessableEntity)
-							json.NewEncoder(w).Encode(v0.ErrorResponse{
-								Error:          err.Error(),
-								DisplayMessage: ptr("unexpected error"),
-							})
-						},
-						ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-							log.Println("response error", err.Error())
-							w.Header().Set("Content-Type", "application/json")
-							w.WriteHeader(http.StatusInternalServerError)
-							json.NewEncoder(w).Encode(v0.ErrorResponse{
-								Error:          err.Error(),
-								DisplayMessage: ptr("unexpected error"),
-							})
-						},
-					}),
-					v0.ChiServerOptions{
-						ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-							log.Println("chi error handler", err.Error())
-							return
-						},
-					}).ServeHTTP(w, r)
+				v0Handler.ServeHTTP(w, r)
 			},
 			verifier, &cfg))
+
 	if v, ok := os.LookupEnv("NUPIN_DEVELOPMENT"); ok && v == "true" {
 		u, err := url.Parse("http://localhost:3000")
 		if err != nil {
@@ -538,5 +553,42 @@ func main() {
 			}, verifier, &cfg))
 		mux.Handle("/*", http.FileServer(http.FS(dir)))
 	}
-	log.Fatal(http.ListenAndServe(cfg.Web.Address, mux))
+
+	g := run.Group{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g.Add(run.SignalHandler(ctx, os.Interrupt))
+	{
+		l, err := net.Listen("tcp", cfg.Web.Address)
+		if err != nil {
+			log.Fatal(err)
+		}
+		g.Add(func() error {
+			return http.Serve(l, mux)
+		},
+			func(err error) {
+				l.Close()
+			})
+	}
+	{
+		mux := http.NewServeMux()
+		mux.Handle("/", internalserver.NewHandler(
+			internalserver.WithName("internal"),
+			internalserver.WithPrometheusRegistry(reg),
+			internalserver.WithPProf(),
+		))
+		l, err := net.Listen("tcp", cfg.Web.InternalAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
+		g.Add(func() error {
+			return http.Serve(l, mux)
+		},
+			func(err error) {
+				l.Close()
+			})
+	}
+	if err := g.Run(); err != nil {
+		log.Fatal(err)
+	}
 }

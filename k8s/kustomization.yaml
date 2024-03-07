@@ -10,6 +10,7 @@ labels:
 resources:
   - manifests/deployment.yaml
   - manifests/svc.yaml
+  - manifests/svc-monitor.yaml
   - manifests/ingress.yaml
 
 secretGenerator:
