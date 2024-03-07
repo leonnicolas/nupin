@@ -11,7 +11,8 @@ type Config struct {
 		CookieDomain string `yaml:"cookieDomain"`
 	} `yaml:"oidc"`
 	Web struct {
-		Address string `yaml:"address"`
+		Address         string `yaml:"address"`
+		InternalAddress string `yaml:"internalAddress"`
 	} `yaml:"web"`
 	Nuki struct {
 		APIKey          string `yaml:"apiKey"`
