@@ -16,6 +16,8 @@ type Config struct {
 	Nuki struct {
 		APIKey          string `yaml:"apiKey"`
 		SmartLockDevice int64  `yaml:"smartLockDevice"`
+		// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
+		MinimumPinEntropy float64 `yaml:"minimumPinEntropy,omitempty"`
 	} `yaml:"nuki"`
 	StorageType string `yaml:"storageType"`
 	Redis       struct {
