@@ -18,6 +18,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-openapi/strfmt"
+	passwdv "github.com/wagslane/go-password-validator"
 
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
@@ -171,7 +172,7 @@ func authMiddleware(next http.HandlerFunc, verifier *oidc.IDTokenVerifier, cfg *
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie("jwt")
 		if err != nil {
-			fmt.Println("no cookie")
+			log.Println("no cookie")
 			redirectOrError(w, r, http.StatusUnauthorized, "missing cookie")
 
 			return
@@ -275,6 +276,15 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 			Body: v0.ApiError{
 				DisplayMessage: ptr("unexpeced error"),
 				Error:          "missing email",
+			},
+		}, nil
+	}
+	if e := passwdv.GetEntropy(fmt.Sprintf("%d", request.Body.Code)); e < s.cfg.Nuki.MinimumPinEntropy {
+		return v0.UpdatePindefaultJSONResponse{
+			StatusCode: http.StatusBadRequest,
+			Body: v0.ApiError{
+				DisplayMessage: ptr("Please select a stronger Pin"),
+				Error:          fmt.Sprintf("code's entropy is too low (%f < %f)", e, s.cfg.Nuki.MinimumPinEntropy),
 			},
 		}, nil
 	}
@@ -415,6 +425,7 @@ func main() {
 
 	var cfg config.Config
 	cfg.Web.Address = ":9999"
+	cfg.Nuki.MinimumPinEntropy = 10
 
 	if ConfigPath != "" {
 		log.Println("reading Config from", ConfigPath)
