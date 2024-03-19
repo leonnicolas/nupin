@@ -13,7 +13,7 @@ build-all:
 generate: api/nuki/swagger.json
 	go generate ./...
 
-generate-all: generate fe/src/client/index.ts
+generate-all: generate fe/src/client/index.ts README.md
 
 api/nuki/swagger.json: api/nuki/patch.json
 	curl -o - https://api.nuki.io/static/swagger/swagger.json | sed 's/"int"/"integer"/' | go run github.com/evanphx/json-patch/cmd/json-patch -p ./api/nuki/patch.json | jq > $@
@@ -24,6 +24,12 @@ fe/src/client/index.ts:
 fe/build:
 	cd fe && yarn install && yarn build
 
+tmp/help.txt: build
+	mkdir -p tmp
+	./nupin --help 2> $@
+
+README.md: tmp/help.txt
+	go run github.com/campoy/embedmd -w $@
 clean:
 	rm -rf fe/dist
 	rm -rf bin

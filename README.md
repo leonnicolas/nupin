@@ -1,7 +1,22 @@
-package config
+# Nupin
 
-import "github.com/redis/go-redis/v9"
+Web service for creation and updating of personal door pins of a Nuki smart lock authorized with oidc.
 
+## Usage
+
+[embedmd]:# (tmp/help.txt)
+```txt
+Usage of ./nupin:
+  -c, --config string   path to Config file
+  -h, --help            print help text and exit
+```
+
+## Configuration file
+
+The configuration file is expected to be a yaml file with the following schema.
+
+[embedmd]:# (config/config.go /\/\/ Config/ /}$/)
+```go
 // Config defines the schema of the configuration file.
 type Config struct {
 	Oidc struct {
@@ -36,3 +51,9 @@ type Config struct {
 		Options *redis.Options `yaml:"options,omitempty"`
 	} `yaml:"redis"`
 }
+```
+
+## k8s
+
+Use the kustomization.yaml file in [k8s](k8s) as a base.
+You will need to update the oidc and nuki configuration.
