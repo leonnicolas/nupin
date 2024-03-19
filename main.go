@@ -227,6 +227,7 @@ var ConfigPath string
 
 func init() {
 	flag.StringVarP(&ConfigPath, "config", "c", "", "path to Config file")
+	flag.BoolP("help", "h", false, "print help text and exit")
 }
 
 type server struct {
@@ -424,6 +425,11 @@ var _ v0.StrictServerInterface = &server{}
 
 func main() {
 	flag.Parse()
+
+	if help, _ := flag.CommandLine.GetBool("help"); help {
+		flag.Usage()
+		return
+	}
 
 	ctx := context.Background()
 
