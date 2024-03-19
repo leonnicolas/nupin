@@ -2,6 +2,8 @@
 
 Web service for creation and updating of personal door pins of a Nuki smart lock authorized with oidc.
 
+![screenshot](screenshot.png)
+
 ## Usage
 
 [embedmd]:# (tmp/help.txt)

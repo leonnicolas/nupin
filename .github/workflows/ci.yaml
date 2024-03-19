@@ -22,6 +22,30 @@ jobs:
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
 
+  vet:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+    - run: yarn
+    - run: make fe/build
+    - run: go vet -race ./...
+    - run: git diff --exit-code
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+    - run: gofmt -d .
+
   generate:
     runs-on: ubuntu-latest
     steps:
