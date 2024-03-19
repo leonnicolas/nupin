@@ -1,4 +1,4 @@
-.PHONY: generate build build-all generate-all fe/build clean
+.PHONY: generate build build-all generate-all fe/build clean vet
 
 ALL_ARCH := amd64 arm arm64
 
