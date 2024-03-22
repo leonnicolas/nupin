@@ -30,7 +30,8 @@ func TestUpdatePin(t *testing.T) {
 			APIKey          string `yaml:"apiKey"`
 			SmartLockDevice int64  `yaml:"smartLockDevice"`
 			// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
-			MinimumPinEntropy float64 `yaml:"minimumPinEntropy,omitempty"`
+			MinimumPinEntropy  float64 `yaml:"minimumPinEntropy,omitempty"`
+			AllowMonotonicPins bool    `yaml:"allowMonotonicPins,omitempty"`
 		}{
 			MinimumPinEntropy: 10,
 		},
