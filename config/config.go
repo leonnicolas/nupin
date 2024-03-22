@@ -23,7 +23,11 @@ type Config struct {
 		// SmartLockDevice is the ID of the nuki smart lock.
 		SmartLockDevice int64 `yaml:"smartLockDevice"`
 		// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
+		// We use https://github.com/wagslane/go-password-validator, which can return confusing results.
+		// For example 112233 and 938163 have the same entropy.
 		MinimumPinEntropy float64 `yaml:"minimumPinEntropy,omitempty"`
+		// AllowMonotonousPins will allow Pins like 123456, 122334 or 654321, 662211, ...
+		AllowMonotonicPins bool `yaml:"allowMonotonicPins,omitempty"`
 	} `yaml:"nuki"`
 	// StorageType for the state generated in the oauth2 flow. Options are memory or redis.
 	StorageType string `yaml:"storageType"`

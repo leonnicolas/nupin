@@ -105,6 +105,17 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 			},
 		}, nil
 	}
+	if !s.cfg.Nuki.AllowMonotonicPins {
+		if isMonotonic(request.Body.Code) {
+			return v0.UpdatePindefaultJSONResponse{
+				StatusCode: http.StatusBadRequest,
+				Body: v0.ApiError{
+					DisplayMessage: ptr("Please select a stronger Pin"),
+					Error:          fmt.Sprintf("code may not consist of monotonic digits"),
+				},
+			}, nil
+		}
+	}
 
 	usersResponse, err := s.c.AccountUser.AccountUsersResourceGetGet(
 		&account_user.AccountUsersResourceGetGetParams{
@@ -223,6 +234,28 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 	log.Println("updated smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth name", *authRes.Payload[index].Name)
 
 	return &v0.UpdatePin200Response{}, nil
+}
+
+func isMonotonic(input int) bool {
+	a := intToArray(input)
+	return isMonotonicAscedning(a) || isMonotonicDecending(a)
+}
+
+func isMonotonicAscedning(a []int) bool {
+	return slices.IsSorted(a)
+}
+
+func isMonotonicDecending(a []int) bool {
+	slices.Reverse(a)
+	return slices.IsSorted(a)
+}
+
+func intToArray(input int) (a []int) {
+	for n := input; n > 0; n = n / 10 {
+		a = append(a, n%10)
+	}
+	slices.Reverse(a)
+	return a
 }
 
 var _ v0.StrictServerInterface = &server{}
