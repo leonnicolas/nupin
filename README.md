@@ -45,6 +45,17 @@ type Config struct {
 		MinimumPinEntropy float64 `yaml:"minimumPinEntropy,omitempty"`
 		// AllowMonotonousPins will allow Pins like 123456, 122334 or 654321, 662211, ...
 		AllowMonotonicPins bool `yaml:"allowMonotonicPins,omitempty"`
+		// AllowedFromTime is the time in minutes since midnight when the pin is allowed to be used.
+		// Both AllowedFromTime and AllowedUntilTime must be set to enable time restrictions.
+		AllowedFromTime *int `yaml:"allowedFromTime,omitempty"`
+		// AllowedUntilTime is the time in minutes since midnight when the pin is allowed to be used.
+		// Both AllowedFromTime and AllowedUntilTime must be set to enable time restrictions.
+		AllowedUntilTime *int `yaml:"allowedUntilTime,omitempty"`
+		// AllowedWeekDays is the bitmask of the days the pin is allowed to be used.
+		// The allowed weekdays bitmask: 64 .. monday, 32 .. tuesday, 16 .. wednesday, 8 .. thursday, 4 .. friday, 2 .. saturday, 1 .. sunday
+		// Maximum: 127 (every weekdays)
+		// Minimum: 0 (every weekdays)
+		AllowedWeekDays int `yaml:"allowedWeekDays,omitempty"`
 	} `yaml:"nuki"`
 	// StorageType for the state generated in the oauth2 flow. Options are memory or redis.
 	StorageType string `yaml:"storageType"`

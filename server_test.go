@@ -32,6 +32,9 @@ func TestUpdatePin(t *testing.T) {
 			// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
 			MinimumPinEntropy  float64 `yaml:"minimumPinEntropy,omitempty"`
 			AllowMonotonicPins bool    `yaml:"allowMonotonicPins,omitempty"`
+			AllowedFromTime *int `yaml:"allowedFromTime,omitempty"`
+			AllowedUntilTime *int `yaml:"allowedUntilTime,omitempty"`
+			AllowedWeekDays int `yaml:"allowedWeekDays,omitempty"`
 		}{
 			MinimumPinEntropy: 10,
 		},

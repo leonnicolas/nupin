@@ -178,17 +178,26 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 	})
 	if index == -1 {
 		log.Println("creating auth user", "accountID", *user.AccountUserID, "name", c.Name)
+		body := &models.SmartlockAuthCreate{
+			AccountUserID:       *user.AccountUserID,
+			SmartActionsEnabled: false,
+			Name:                ptr(c.Name),
+			Type:                13,
+			Code:                int32(request.Body.Code),
+			AllowedWeekDays:     ptr(int32(s.cfg.Nuki.AllowedWeekDays)),
+		}
+
+		if s.cfg.Nuki.AllowedUntilTime != nil && s.cfg.Nuki.AllowedFromTime != nil {
+			log.Println("allowed from time", *s.cfg.Nuki.AllowedFromTime, "allowed until time", *s.cfg.Nuki.AllowedUntilTime)
+			body.AllowedFromTime = int32(*s.cfg.Nuki.AllowedFromTime)
+			body.AllowedUntilTime = int32(*s.cfg.Nuki.AllowedUntilTime)
+		}
+
 		_, err := s.c.SmartlockAuth.SmartlockAuthsResourcePutPut(
 			&smartlock_auth.SmartlockAuthsResourcePutPutParams{
 				SmartlockID: s.cfg.Nuki.SmartLockDevice,
 				Context:     ctx,
-				Body: &models.SmartlockAuthCreate{
-					AccountUserID:       *user.AccountUserID,
-					SmartActionsEnabled: false,
-					Name:                ptr(c.Name),
-					Type:                13,
-					Code:                int32(request.Body.Code),
-				},
+				Body:        body,
 			},
 			httptransport.BearerToken(s.cfg.Nuki.APIKey),
 		)
@@ -207,17 +216,26 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 	}
 
 	log.Println("found smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth ID", *user.AccountUserID, "auth name", *authRes.Payload[index].Name)
+	log.Println("allowed week days", s.cfg.Nuki.AllowedWeekDays)
+	body := &models.SmartlockAuthUpdate{
+		Code:            int32(request.Body.Code),
+		Enabled:         true,
+		AccountUserID:   *user.AccountUserID,
+		AllowedWeekDays: ptr(int32(s.cfg.Nuki.AllowedWeekDays)),
+	}
+
+	if s.cfg.Nuki.AllowedUntilTime != nil && s.cfg.Nuki.AllowedFromTime != nil {
+		log.Println("allowed from time", *s.cfg.Nuki.AllowedFromTime, "allowed until time", *s.cfg.Nuki.AllowedUntilTime)
+		body.AllowedFromTime = int32(*s.cfg.Nuki.AllowedFromTime)
+		body.AllowedUntilTime = int32(*s.cfg.Nuki.AllowedUntilTime)
+	}
 
 	_, err = s.c.SmartlockAuth.SmartlockAuthResourcePostPost(
 		&smartlock_auth.SmartlockAuthResourcePostPostParams{
 			SmartlockID: s.cfg.Nuki.SmartLockDevice,
 			Context:     ctx,
-			Body: &models.SmartlockAuthUpdate{
-				Code:          int32(request.Body.Code),
-				Enabled:       true,
-				AccountUserID: *user.AccountUserID,
-			},
-			ID: *authRes.Payload[index].ID,
+			Body:        body,
+			ID:          *authRes.Payload[index].ID,
 		},
 		httptransport.BearerToken(s.cfg.Nuki.APIKey),
 	)
