@@ -25,6 +25,7 @@ require (
 	github.com/vektra/mockery/v2 v2.20.0
 	github.com/wagslane/go-password-validator v0.3.0
 	golang.org/x/oauth2 v0.13.0
+	golang.org/x/sync v0.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

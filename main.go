@@ -65,6 +65,21 @@ func main() {
 		}
 	}
 
+	if len(cfg.Nuki.SmartLockDevices) == 0 && cfg.Nuki.SmartLockDevice == 0 {
+		log.Fatal("no smart lock device configured")
+	}
+
+	if cfg.Nuki.SmartLockDevice != 0 {
+		log.Println("smartLockDevice is deprecated, use smartLockDevices instead")
+		if len(cfg.Nuki.SmartLockDevices) != 0 {
+			log.Fatal("SmartLockDevices is already set, remove SmartLockDevice from the config file")
+		}
+	}
+	// Retro compatibility
+	if len(cfg.Nuki.SmartLockDevices) == 0 {
+		cfg.Nuki.SmartLockDevices = append(cfg.Nuki.SmartLockDevices, cfg.Nuki.SmartLockDevice)
+	}
+
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 

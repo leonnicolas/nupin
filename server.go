@@ -4,20 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"net/http"
 	"slices"
 
 	httptransport "github.com/go-openapi/runtime/client"
-	"github.com/prometheus/client_golang/prometheus"
-	passwdv "github.com/wagslane/go-password-validator"
-
 	nukiclient "github.com/leonnicolas/nupin/api/nuki/client"
 	"github.com/leonnicolas/nupin/api/nuki/client/account_user"
 	"github.com/leonnicolas/nupin/api/nuki/client/smartlock_auth"
 	"github.com/leonnicolas/nupin/api/nuki/models"
 	v0 "github.com/leonnicolas/nupin/api/v0"
 	"github.com/leonnicolas/nupin/config"
+	"github.com/prometheus/client_golang/prometheus"
+	passwdv "github.com/wagslane/go-password-validator"
 )
 
 type server struct {
@@ -163,21 +163,52 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 		user = usersResponse.Payload[0]
 	}
 
+	var results []v0.UpdatePinResponseObject
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i := range s.cfg.Nuki.SmartLockDevices {
+		func(smd int64) {
+			g.Go(func() error {
+				res, err := s.updateSmartLock(ctx, request, smd, user)
+				results = append(results, res)
+				return err
+			})
+		}(s.cfg.Nuki.SmartLockDevices[i])
+	}
+
+	err = g.Wait()
+	if err != nil {
+		return nil, err
+	}
+	for _, res := range results {
+		switch res.(type) {
+		case v0.UpdatePindefaultJSONResponse:
+			// Return on any known http error
+			if res.(v0.UpdatePindefaultJSONResponse).StatusCode != http.StatusOK {
+				return res, nil
+			}
+		}
+	}
+	return &v0.UpdatePin200Response{}, nil
+}
+
+func (s *server) updateSmartLock(ctx context.Context, request v0.UpdatePinRequestObject, smartlockdevice int64, user *models.AccountUser) (v0.UpdatePinResponseObject, error) {
+	c, _ := ctx.Value("claims").(claims)
 	authRes, err := s.c.SmartlockAuth.SmartlockAuthsResourceGetGet(
 		&smartlock_auth.SmartlockAuthsResourceGetGetParams{
 			Context: ctx, Types: ptr("13"),
-			SmartlockID: s.cfg.Nuki.SmartLockDevice,
+			SmartlockID: smartlockdevice,
 		},
 		httptransport.BearerToken(s.cfg.Nuki.APIKey),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get auths: %w", err)
+		return nil, fmt.Errorf("[%d] failed to get auths: %w", smartlockdevice, err)
 	}
 	index := slices.IndexFunc(authRes.Payload, func(a *models.SmartlockAuth) bool {
 		return a.AccountUserID == *user.AccountUserID
 	})
 	if index == -1 {
-		log.Println("creating auth user", "accountID", *user.AccountUserID, "name", c.Name)
+		log.Println("creating auth user", "accountID", *user.AccountUserID, "name", c.Name, "device", smartlockdevice)
 		body := &models.SmartlockAuthCreate{
 			AccountUserID:       *user.AccountUserID,
 			SmartActionsEnabled: false,
@@ -202,7 +233,7 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 			httptransport.BearerToken(s.cfg.Nuki.APIKey),
 		)
 		if err != nil {
-			log.Println("failed to create auth user", "accountID", *user.AccountUserID, "name", c.Name, err.Error())
+			log.Println("failed to create auth user", "accountID", *user.AccountUserID, "name", c.Name, "device", smartlockdevice, err.Error())
 			return v0.UpdatePindefaultJSONResponse{
 				StatusCode: http.StatusBadRequest,
 				Body: v0.ApiError{
@@ -215,7 +246,7 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 		return &v0.UpdatePin200Response{}, nil
 	}
 
-	log.Println("found smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth ID", *user.AccountUserID, "auth name", *authRes.Payload[index].Name)
+	log.Println("found smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth ID", *user.AccountUserID, "auth name", *authRes.Payload[index].Name, "device", smartlockdevice)
 	log.Println("allowed week days", s.cfg.Nuki.AllowedWeekDays)
 	body := &models.SmartlockAuthUpdate{
 		Code:            int32(request.Body.Code),
@@ -232,7 +263,7 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 
 	_, err = s.c.SmartlockAuth.SmartlockAuthResourcePostPost(
 		&smartlock_auth.SmartlockAuthResourcePostPostParams{
-			SmartlockID: s.cfg.Nuki.SmartLockDevice,
+			SmartlockID: smartlockdevice,
 			Context:     ctx,
 			Body:        body,
 			ID:          *authRes.Payload[index].ID,
@@ -249,8 +280,7 @@ func (s *server) UpdatePin(ctx context.Context, request v0.UpdatePinRequestObjec
 		}, nil
 	}
 
-	log.Println("updated smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth name", *authRes.Payload[index].Name)
-
+	log.Println("updated smartlock auth", *authRes.Payload[index].ID, "claim name", c.Email, "auth name", *authRes.Payload[index].Name, "device", smartlockdevice)
 	return &v0.UpdatePin200Response{}, nil
 }
 

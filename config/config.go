@@ -20,8 +20,11 @@ type Config struct {
 	Nuki struct {
 		// APIKey is the Nuki API token
 		APIKey string `yaml:"apiKey"`
-		// SmartLockDevice is the ID of the nuki smart lock.
-		SmartLockDevice int64 `yaml:"smartLockDevice"`
+		// (Depracated) SmartLockDevice is the ID of the nuki smart lock. Use SmartLockDevices instead
+		SmartLockDevice int64 `yaml:"smartLockDevice,omitempty"`
+		// SmartLockDevices is the list of ID of the nuki smart locks to manage. They are all updated with the same pin.
+		// At least one SmartLockDevice ID must be set.
+		SmartLockDevices []int64 `yaml:"smartLockDevices,omitempty"`
 		// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
 		// We use https://github.com/wagslane/go-password-validator, which can return confusing results.
 		// For example 112233 and 938163 have the same entropy.
