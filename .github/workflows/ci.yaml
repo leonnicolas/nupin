@@ -37,8 +37,21 @@ jobs:
         node-version: 18
     - run: yarn
     - run: make fe/build
-    - run: go vet -race ./...
-    - run: git diff --exit-code
+    - run: make vet
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+    - run: yarn
+    - run: make fe/build
+    - run: make test
 
   fmt:
     runs-on: ubuntu-latest

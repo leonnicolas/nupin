@@ -1,4 +1,4 @@
-.PHONY: generate build build-all generate-all fe/build clean vet
+.PHONY: generate build build-all generate-all fe/build clean vet test
 
 ALL_ARCH := amd64 arm arm64
 
@@ -30,6 +30,13 @@ tmp/help.txt: build
 
 README.md: tmp/help.txt
 	go run github.com/campoy/embedmd -w $@
+
+vet:
+	go vet -race ./...
+
+test:
+	go test ./...
+
 clean:
 	rm -rf fe/dist
 	rm -rf bin
