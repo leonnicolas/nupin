@@ -27,8 +27,9 @@ import (
 func TestUpdatePin(t *testing.T) {
 	cfg := &config.Config{
 		Nuki: struct {
-			APIKey          string `yaml:"apiKey"`
-			SmartLockDevice int64  `yaml:"smartLockDevice"`
+			APIKey           string  `yaml:"apiKey"`
+			SmartLockDevice  int64   `yaml:"smartLockDevice,omitempty"`
+			SmartLockDevices []int64 `yaml:"smartLockDevices,omitempty"`
 			// MinimumPinEntropy is the mimimum entropy needed by a pin to be accepted (default: 10)
 			MinimumPinEntropy  float64 `yaml:"minimumPinEntropy,omitempty"`
 			AllowMonotonicPins bool    `yaml:"allowMonotonicPins,omitempty"`
@@ -36,6 +37,7 @@ func TestUpdatePin(t *testing.T) {
 			AllowedUntilTime   *int    `yaml:"allowedUntilTime,omitempty"`
 			AllowedWeekDays    int     `yaml:"allowedWeekDays,omitempty"`
 		}{
+			SmartLockDevices:  []int64{1111, 2222},
 			MinimumPinEntropy: 10,
 		},
 	}
